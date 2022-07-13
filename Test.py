@@ -1,10 +1,13 @@
+from email import header
+from operator import index
 from typing import final
 import cv2
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import csv
-
+import time
+print("Start" + str(time.time()))
 try:
     from PIL import Image
 except ImportError:
@@ -13,10 +16,36 @@ import pytesseract
 
 pytesseract.pytesseract.tesseract_cmd=r"C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
 
+# def dropNullColumns(df):
+#     """
+#     This function drops columns containing all null values.
+#     :param df: A PySpark DataFrame
+#     """
+  
+#     null_counts = df.select([sqlf.count(sqlf.when(sqlf.col(c).isNull(), c)).alias(
+#         c) for c in df.columns]).collect()[0].asDict()  # 1
+#     col_to_drop = [k for k, v in null_counts.items() if v > 0]  # 2
+#     df = df.drop(*col_to_drop)  # 3
+  
+#     return df
+
 #read your file
-file=r'image1.jpeg'
-img = cv2.imread(file,0)
-img3=cv2.imread(file)
+file=r'Img.png'
+image = cv2.imread(file) 
+gray=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY) 
+edged = cv2.Canny(image, 10, 250) 
+(cnts, _) = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE) 
+idx = 0 
+l=[]
+for c in cnts: 
+	x,y,w,h = cv2.boundingRect(c) 
+	if w>50 and h>50: 
+		idx+=1
+		if idx==1:
+			new_img=image[y:y+h,x:x+w] 
+			cv2.imwrite(str(idx) + '.jpeg', new_img)
+img = cv2.imread("1.jpeg",0)
+img3=cv2.imread("1.jpeg")
 img.shape
 
 img_hsv = cv2.cvtColor(img3, cv2.COLOR_BGR2HSV)
@@ -36,7 +65,7 @@ thresh,img_bin = cv2.threshold(img,128,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
 #inverting the image 
 img_bin = 255-img_bin
-cv2.imwrite('cv_inverted.png',img_bin)
+#cv2.imwrite('cv_inverted.png',img_bin)
 #Plotting the image to see the output
 plotting = plt.imshow(img_bin,cmap='gray')
 #plt.show()
@@ -53,7 +82,7 @@ kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
 #Use vertical kernel to detect and save the vertical lines in a jpg
 image_1 = cv2.erode(img_bin, ver_kernel, iterations=3)
 vertical_lines = cv2.dilate(image_1, ver_kernel, iterations=3)
-cv2.imwrite("vertical.jpg",vertical_lines)
+#cv2.imwrite("vertical.jpg",vertical_lines)
 #Plot the generated image
 plotting = plt.imshow(image_1,cmap='gray')
 #plt.show()
@@ -61,7 +90,7 @@ plotting = plt.imshow(image_1,cmap='gray')
 #Use horizontal kernel to detect and save the horizontal lines in a jpg
 image_2 = cv2.erode(img_bin, hor_kernel, iterations=3)
 horizontal_lines = cv2.dilate(image_2, hor_kernel, iterations=3)
-cv2.imwrite("horizontal.jpg",horizontal_lines)
+#cv2.imwrite("horizontal.jpg",horizontal_lines)
 #Plot the generated image
 plotting = plt.imshow(image_2,cmap='gray')
 #plt.show()
@@ -71,7 +100,7 @@ img_vh = cv2.addWeighted(vertical_lines, 0.5, horizontal_lines, 0.5, 0.0)
 #Eroding and thesholding the image
 img_vh = cv2.erode(~img_vh, kernel, iterations=2)
 thresh, img_vh = cv2.threshold(img_vh,128,255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-cv2.imwrite("img_vh.jpg", img_vh)
+#cv2.imwrite("img_vh.jpg", img_vh)
 bitxor = cv2.bitwise_xor(img,img_vh)
 bitnot = cv2.bitwise_not(bitxor)
 #Plotting the generated image
@@ -177,7 +206,7 @@ for i in range(len(row)):
         lis[indexing].append(row[i][j])
     finalboxes.append(lis)
 
-
+#print(len(finalboxes))
 
 #from every single image-based cell/box the strings are extracted via pytesseract and stored in a list
 outer=[]
@@ -222,7 +251,17 @@ for i in range(len(finalboxes)):
 #Creating a dataframe of the generated OCR list
 arr = np.array(outer)
 dataframe = pd.DataFrame(arr.reshape(len(row), countcol))
+#dataframe = dropNullColumns(dataframe)
+nan_value = float("NaN")
+dataframe.replace("", nan_value, inplace=True)
+dataframe.dropna(how='all', axis=1, inplace=True)
+dataframe = dataframe.drop([0,7],axis=1)
+dataframe = dataframe.drop([0,1,2,3,14,15,16,17],axis=0)
+arr=["Mon:Thry","Mon:Lab","Tue:Thry","Tue:Lab","Wed:Thry","Wed:Lab","Thu:Thry","Thu:Lab","Fri:Thry","Fri:Lab"]
+dataframe.insert(0,"0",arr)
+data = dataframe.style.set_properties()
+# dataframe.to_csv("output1.csv",index=False, header=False)
+dataframe = dataframe.to_string(index=False,header=False)
 print(dataframe)
-data = dataframe.style.set_properties(align="left")
-dataframe.to_csv("output1.csv")
-#Hello
+print("End "+ str(time.time()))
+
